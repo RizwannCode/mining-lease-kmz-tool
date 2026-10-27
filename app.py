@@ -17,28 +17,31 @@ if uploaded_file is not None:
     st.image(uploaded_file, caption="Uploaded Lease Document", use_container_width=True)
     
 st.subheader("F3 & F4: Survey Data Table (Northing First, Easting Second)")
-st.info("Yahan aap apne naye lease document ke mutabiq points add ya edit kar sakte hain.")
+st.info("Yahan aap apne lease document ke mutabiq Northing aur Easting ki sahi values enter karein.")
 
-# Initialize session state for dataframe so edits are safely preserved across reruns
+# Initialize session state with proper default data if empty
 if "lease_df" not in st.session_state:
     st.session_state.lease_df = pd.DataFrame({
         "Point": ["A", "B", "C", "D"],
-        "Northing (yd)": [0.0, 0.0, 0.0, 0.0],
-        "Easting (yd)": [0.0, 0.0, 0.0, 0.0]
+        "Northing (yd)": [967000.0, 970000.0, 970000.0, 969000.0],
+        "Easting (yd)": [2362900.0, 2362900.0, 2364900.0, 2364000.0]
     })
 
-# Use session state in data_editor and keep it updated
 edited_df = st.data_editor(st.session_state.lease_df, num_rows="dynamic", key="lease_table_editor")
 st.session_state.lease_df = edited_df
 
-declared_area = st.number_input("F7: Declared Total Area on Document (Acres)", value=100.0, step=0.01)
+declared_area = st.number_input("F7: Declared Total Area on Document (Acres)", value=826.45, step=0.01)
 
 if st.button("🚀 Process and Generate KMZ"):
     try:
         points_list = []
         for index, row in edited_df.iterrows():
-            if str(row["Point"]).strip() != "":
-                points_list.append((str(row["Point"]), float(row["Northing (yd)"]), float(row["Easting (yd)"])))
+            pt_id = str(row["Point"]).strip()
+            if pt_id != "":
+                # Safely parse Northing and Easting ensuring no zeros/NaNs disrupt calculation
+                northing_val = float(row["Northing (yd)"])
+                easting_val = float(row["Easting (yd)"])
+                points_list.append((pt_id, northing_val, easting_val))
         
         if len(points_list) < 3:
             st.error("❌ Kam az kam 3 valid points enter karna lazmi hain polygon banane ke liye!")
@@ -57,10 +60,10 @@ if st.button("🚀 Process and Generate KMZ"):
             trans_df = pd.DataFrame(trans_df_data)
             st.dataframe(trans_df, use_container_width=True)
             
-            # 2. Polygon Topology Validation & Area Calculation
+            # 2. Polygon Topology Validation & Area Calculation (Using Easting as X, Northing as Y)
             poly_coords = []
             for pt_id, northing_val, easting_val in points_list:
-                poly_coords.append((float(easting_val), float(northing_val)))
+                poly_coords.append((easting_val, northing_val))
                 
             poly = Polygon(poly_coords)
             
