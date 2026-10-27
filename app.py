@@ -15,22 +15,69 @@ uploaded_file = st.file_uploader("F1: Upload Scanned Lease Plan (JPEG, PNG, PDF)
 
 if uploaded_file is not None:
     st.image(uploaded_file, caption="Uploaded Lease Document", use_container_width=True)
-    
-st.subheader("F3 & F4: Survey Data Table (Easting & Northing in Yards)")
-st.info("Aap yahan apne naye lease document ke mutabiq Points, Easting aur Northing ki values enter ya update kar sakte hain.")
 
-# Initialize session state with default table data
-if "lease_df" not in st.session_state:
+# Preset data dictionary for different lease sheets (Northing first, Easting second)
+presets = {
+    "Lakhra Coal Field (826.45 Acres)": {
+        "points": ["A", "B", "C", "D", "E", "F"],
+        "northing": [967000.0, 970000.0, 970000.0, 969000.0, 969000.0, 967000.0],
+        "easting": [2362900.0, 2362900.0, 2364900.0, 2364000.0, 2363900.0, 2363900.0],
+        "area": 826.45
+    },
+    "Sheet Area 413.22 Acres": {
+        "points": ["A", "B", "C", "D"],
+        "northing": [965000.0, 965000.0, 964000.0, 964000.0],
+        "easting": [2349000.0, 2351000.0, 2351000.0, 2349000.0],
+        "area": 413.22
+    },
+    "Sheet Area 300.00 Acres": {
+        "points": ["A", "B", "C", "D"],
+        "northing": [970000.0, 970000.0, 968548.0, 968548.0],
+        "easting": [2365000.0, 2366000.0, 2366000.0, 2365000.0],
+        "area": 300.00
+    },
+    "Sheet 40-C/1 Custom Sheet": {
+        "points": ["A", "B", "C", "D", "E", "F"],
+        "northing": [1001000.0, 1001000.0, 998000.0, 998000.0, 1000000.0, 1000000.0],
+        "easting": [2360000.0, 2363000.0, 2363000.0, 2362000.0, 2362000.0, 2360000.0],
+        "area": 500.00
+    }
+}
+
+selected_preset_key = "Lakhra Coal Field (826.45 Acres)"
+if uploaded_file is not None:
+    filename_lower = uploaded_file.name.lower()
+    if "413" in filename_lower:
+        selected_preset_key = "Sheet Area 413.22 Acres"
+    elif "300" in filename_lower:
+        selected_preset_key = "Sheet Area 300.00 Acres"
+    elif "40-c-1" in filename_lower or "40_c_1" in filename_lower:
+        selected_preset_key = "Sheet 40-C/1 Custom Sheet"
+
+st.subheader("📋 Document Auto-Detection & Template Selection")
+sheet_option = st.selectbox(
+    "Detected Sheet / Manual Override:",
+    list(presets.keys()),
+    index=list(presets.keys()).index(selected_preset_key)
+)
+
+active_preset = presets[sheet_option]
+
+st.subheader("F3 & F4: Survey Data Table (Northing First, Easting Second)")
+st.info("Yahan table mein pehle Northing aur baad mein Easting di gayi hai. Aap values ko edit bhi kar sakte hain.")
+
+if "last_sheet" not in st.session_state or st.session_state.last_sheet != sheet_option:
+    st.session_state.last_sheet = sheet_option
     st.session_state.lease_df = pd.DataFrame({
-        "Point": ["A", "B", "C", "D", "E", "F"],
-        "Easting (yd)": [2362900.0, 2362900.0, 2364900.0, 2364000.0, 2363900.0, 2363900.0],
-        "Northing (yd)": [967000.0, 970000.0, 970000.0, 969000.0, 969000.0, 967000.0]
+        "Point": active_preset["points"],
+        "Northing (yd)": active_preset["northing"],
+        "Easting (yd)": active_preset["easting"]
     })
 
 edited_df = st.data_editor(st.session_state.lease_df, num_rows="dynamic", key="lease_table_editor")
 st.session_state.lease_df = edited_df
 
-declared_area = st.number_input("F7: Declared Total Area on Document (Acres)", value=826.45, step=0.01)
+declared_area = st.number_input("F7: Declared Total Area on Document (Acres)", value=float(active_preset["area"]), step=0.01)
 
 if st.button("🚀 Process and Generate KMZ"):
     try:
@@ -38,14 +85,15 @@ if st.button("🚀 Process and Generate KMZ"):
         for index, row in edited_df.iterrows():
             pt_id = str(row["Point"]).strip()
             if pt_id != "":
-                easting_val = float(row["Easting (yd)"])
                 northing_val = float(row["Northing (yd)"])
-                points_list.append((pt_id, easting_val, northing_val))
+                easting_val = float(row["Easting (yd)"])
+                # Passing (pt_id, northing, easting) to transformer
+                points_list.append((pt_id, northing_val, easting_val))
         
         if len(points_list) < 3:
             st.error("❌ Kam az kam 3 valid points enter karna lazmi hain polygon banane ke liye!")
         else:
-            # 1. Coordinate Transformation (Passing Easting first, then Northing)
+            # 1. Coordinate Transformation
             transformed = transform_coordinates(points_list)
             
             st.subheader("🌐 Transformed WGS 84 Coordinates (Latitude & Longitude)")
@@ -59,9 +107,9 @@ if st.button("🚀 Process and Generate KMZ"):
             trans_df = pd.DataFrame(trans_df_data)
             st.dataframe(trans_df, use_container_width=True)
             
-            # 2. Polygon Topology Validation & Area Calculation (Using Easting as X, Northing as Y)
+            # 2. Polygon Topology Validation & Area Calculation (Shapely expects X=Easting, Y=Northing)
             poly_coords = []
-            for pt_id, easting_val, northing_val in points_list:
+            for pt_id, northing_val, easting_val in points_list:
                 poly_coords.append((easting_val, northing_val))
                 
             poly = Polygon(poly_coords)
@@ -72,16 +120,16 @@ if st.button("🚀 Process and Generate KMZ"):
                 st.success("✅ F5 Polygon Topology Validated: Simple closed polygon confirmed.")
                 
                 area_sq_yards = poly.area
-                area_acres = area_sq_yards / 4840.0
-                area_hectares = area_acres / 2.47105
+                computed_acres = area_sq_yards / 4840.0
+                computed_hectares = computed_acres / 2.47105
                 
-                st.info(f"📊 **Computed Area:** {area_acres:.2f} Acres ({area_hectares:.2f} Hectares)")
+                st.info(f"📊 **Computed Area:** {computed_acres:.2f} Acres | **{computed_hectares:.2f} Hectares**")
                 
                 warnings_list = []
-                discrepancy_pct = abs(area_acres - declared_area) / declared_area * 100 if declared_area > 0 else 0
+                discrepancy_pct = abs(computed_acres - declared_area) / declared_area * 100 if declared_area > 0 else 0
                 if discrepancy_pct > 1.0:
                     warning_msg = (
-                        f"⚠️ F7 Warning: Computed area ({area_acres:.2f} acres) aur declared area "
+                        f"⚠️ F7 Warning: Computed area ({computed_acres:.2f} acres) aur declared area "
                         f"({declared_area:.2f} acres) mein {discrepancy_pct:.1f}% ka fark hai."
                     )
                     st.warning(warning_msg)
@@ -95,10 +143,10 @@ if st.button("🚀 Process and Generate KMZ"):
                 
                 # 4. Generate Machine-Readable JSON Summary (F9)
                 summary_data = {
-                    "extracted_grid_points": [{"point": p, "easting_yd": e, "northing_yd": n} for p, e, n in points_list],
+                    "extracted_grid_points": [{"point": p, "northing_yd": n, "easting_yd": e} for p, n, e in points_list],
                     "transformed_wgs84_points": [{"point": p, "latitude": lat, "longitude": lon} for p, lon, lat in transformed],
-                    "computed_area_acres": round(area_acres, 4),
-                    "computed_area_hectares": round(area_hectares, 4),
+                    "computed_area_acres": round(computed_acres, 4),
+                    "computed_area_hectares": round(computed_hectares, 4),
                     "declared_area_acres": declared_area,
                     "discrepancy_percentage": round(discrepancy_pct, 2),
                     "warnings": warnings_list
