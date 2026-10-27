@@ -3,8 +3,8 @@ import json
 import streamlit as st
 import pandas as pd
 from shapely.geometry import Polygon
-from utils.transformer import transform_coordinates
-from utils.exporter import validate_and_export_kmz
+from transformer import transform_coordinates
+from exporter import validate_and_export_kmz
 
 st.set_page_config(page_title="Mining Lease to KMZ Converter", page_icon="🗺️", layout="wide")
 
@@ -17,7 +17,7 @@ if uploaded_file is not None:
     st.image(uploaded_file, caption="Uploaded Lease Document", use_container_width=True)
     
     st.subheader("F3 & F4: Extracted Survey Data Table (Northing First, Easting Second)")
-    st.info("Image ke mutabiq Northing pehle aur Easting baad mein set ki gayi hai.")
+    st.info("Benchmark document ke mutabiq Northing pehle aur Easting baad mein set ki gayi hai.")
     
     # Table data with Northing first, Easting second
     initial_data = {
@@ -33,12 +33,11 @@ if uploaded_file is not None:
 
     if st.button("🚀 Process and Generate KMZ"):
         try:
-            # Points list mein (Point, Northing, Easting) pass ho raha hai
             points_list = []
             for index, row in edited_df.iterrows():
                 points_list.append((row["Point"], row["Northing (yd)"], row["Easting (yd)"]))
             
-            # 1. Coordinate Transformation (India Zoned Grid II-a -> WGS 84)
+            # 1. Coordinate Transformation
             transformed = transform_coordinates(points_list)
             
             st.subheader("🌐 Transformed WGS 84 Coordinates (Latitude & Longitude)")
@@ -52,7 +51,7 @@ if uploaded_file is not None:
             trans_df = pd.DataFrame(trans_df_data)
             st.dataframe(trans_df, use_container_width=True)
             
-            # 2. Polygon Topology Validation & Area Calculation (Shapely ke liye easting pehle, northing baad mein)
+            # 2. Polygon Topology Validation & Area Calculation
             poly_coords = []
             for pt_id, northing_val, easting_val in points_list:
                 poly_coords.append((float(easting_val), float(northing_val)))
@@ -75,8 +74,7 @@ if uploaded_file is not None:
                 if discrepancy_pct > 1.0:
                     warning_msg = (
                         f"⚠️ F7 Warning: Computed area ({area_acres:.2f} acres) aur declared area "
-                        f"({declared_area:.2f} acres) mein {discrepancy_pct:.1f}% ka fark hai. "
-                        f"Note: Benchmark document mein Point D par transcription error mojood hai."
+                        f"({declared_area:.2f} acres) mein {discrepancy_pct:.1f}% ka fark hai."
                     )
                     st.warning(warning_msg)
                     warnings_list.append(warning_msg)
