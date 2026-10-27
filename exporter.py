@@ -1,35 +1,30 @@
-import os
 import simplekml
 
-def validate_and_export_kmz(transformed_points):
+def validate_and_export_kmz(transformed_points, filename="mining_lease.kmz"):
     """
-    Takes transformed WGS84 points: [(point_id, lon, lat), ...]
-    Generates a KMZ file with a closed polygon and styled point markers.
+    Generates a KMZ file from transformed WGS84 points (lon, lat).
     """
     kml = simplekml.Kml()
     
-    # Extract longitude and latitude for boundary polygon
-    polygon_coords = [(lon, lat) for pt_id, lon, lat in transformed_points]
-    
-    # Ensure polygon loop is closed
-    if polygon_coords[0] != polygon_coords[-1]:
-        polygon_coords.append(polygon_coords[0])
+    poly_coords = []
+    for pt_id, lon, lat in transformed_points:
+        poly_coords.append((lon, lat, 0))
         
-    # Create Polygon geometry
-    pol = kml.newpolygon(name="Mining Lease Boundary")
-    pol.outerboundaryis = polygon_coords
+    # Close polygon loop if not already closed
+    if poly_coords and poly_coords[0] != poly_coords[-1]:
+        poly_coords.append(poly_coords[0])
+        
+    # Add polygon boundary and styling
+    pol = kml.newpolygon(name="Mining Lease Boundary", outerboundaryis=poly_coords)
     pol.style.linestyle.color = simplekml.Color.red
     pol.style.linestyle.width = 3
-    pol.style.polystyle.color = simplekml.Color.changealphaint(100, simplekml.Color.green)
+    pol.style.polystyle.color = simplekml.Color.changealphatransparency(100, simplekml.Color.green)
     
-    # Add labeled vertices/points
-    for pt_id, lon, lat in transformed_points:
-        pnt = kml.newpoint(name=f"Point {pt_id}", coords=[(lon, lat)])
-        pnt.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/paddle/red-circle.png'
+    # Add point markers for vertices
+    unique_points = transformed_points[:-1] if len(poly_coords) > 1 and poly_coords[0] == poly_coords[-1] else transformed_points
+    for pt_id, lon, lat in unique_points:
+        pnt = kml.newpoint(name=f"Point {pt_id}", coords=[(lon, lat, 0)])
+        pnt.style.iconstyle.icon.href = "http://maps.google.com/mapfiles/kml/paddle/red-circle.png"
         
-    # Export KMZ to output directory
-    os.makedirs("output", exist_ok=True)
-    kmz_path = "output/mining_lease.kmz"
-    kml.savekmz(kmz_path)
-    
-    return kmz_path
+    kml.save(filename)
+    return filename
