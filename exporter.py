@@ -14,11 +14,12 @@ def validate_and_export_kmz(transformed_points, filename="mining_lease.kmz"):
     if poly_coords and poly_coords[0] != poly_coords[-1]:
         poly_coords.append(poly_coords[0])
         
-    # Add polygon boundary and styling
+    # Add polygon boundary and styling (Using standard KML hex color format: AABBGGRR)
     pol = kml.newpolygon(name="Mining Lease Boundary", outerboundaryis=poly_coords)
     pol.style.linestyle.color = simplekml.Color.red
     pol.style.linestyle.width = 3
-    pol.style.polystyle.color = simplekml.Color.changealphatransparency(100, simplekml.Color.green)
+    # Semi-transparent green polygon fill (Alpha=64, Blue=0, Green=255, Red=0 -> 6400ff00)
+    pol.style.polystyle.color = "6400ff00"
     
     # Add point markers for vertices
     unique_points = transformed_points[:-1] if len(poly_coords) > 1 and poly_coords[0] == poly_coords[-1] else transformed_points
