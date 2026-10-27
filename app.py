@@ -16,15 +16,15 @@ uploaded_file = st.file_uploader("F1: Upload Scanned Lease Plan (JPEG, PNG, PDF)
 if uploaded_file is not None:
     st.image(uploaded_file, caption="Uploaded Lease Document", use_container_width=True)
     
-st.subheader("F3 & F4: Survey Data Table (Northing First, Easting Second)")
-st.info("Yahan aap apne lease document ke mutabiq Northing aur Easting ki sahi values enter karein.")
+st.subheader("F3 & F4: Survey Data Table (Easting & Northing in Yards)")
+st.info("Aap yahan apne naye lease document ke mutabiq Points, Easting aur Northing ki values enter ya update kar sakte hain.")
 
-# Initialize session state with proper default data if empty
+# Initialize session state with default table data
 if "lease_df" not in st.session_state:
     st.session_state.lease_df = pd.DataFrame({
-        "Point": ["A", "B", "C", "D"],
-        "Northing (yd)": [967000.0, 970000.0, 970000.0, 969000.0],
-        "Easting (yd)": [2362900.0, 2362900.0, 2364900.0, 2364000.0]
+        "Point": ["A", "B", "C", "D", "E", "F"],
+        "Easting (yd)": [2362900.0, 2362900.0, 2364900.0, 2364000.0, 2363900.0, 2363900.0],
+        "Northing (yd)": [967000.0, 970000.0, 970000.0, 969000.0, 969000.0, 967000.0]
     })
 
 edited_df = st.data_editor(st.session_state.lease_df, num_rows="dynamic", key="lease_table_editor")
@@ -38,15 +38,14 @@ if st.button("🚀 Process and Generate KMZ"):
         for index, row in edited_df.iterrows():
             pt_id = str(row["Point"]).strip()
             if pt_id != "":
-                # Safely parse Northing and Easting ensuring no zeros/NaNs disrupt calculation
-                northing_val = float(row["Northing (yd)"])
                 easting_val = float(row["Easting (yd)"])
-                points_list.append((pt_id, northing_val, easting_val))
+                northing_val = float(row["Northing (yd)"])
+                points_list.append((pt_id, easting_val, northing_val))
         
         if len(points_list) < 3:
             st.error("❌ Kam az kam 3 valid points enter karna lazmi hain polygon banane ke liye!")
         else:
-            # 1. Coordinate Transformation
+            # 1. Coordinate Transformation (Passing Easting first, then Northing)
             transformed = transform_coordinates(points_list)
             
             st.subheader("🌐 Transformed WGS 84 Coordinates (Latitude & Longitude)")
@@ -62,7 +61,7 @@ if st.button("🚀 Process and Generate KMZ"):
             
             # 2. Polygon Topology Validation & Area Calculation (Using Easting as X, Northing as Y)
             poly_coords = []
-            for pt_id, northing_val, easting_val in points_list:
+            for pt_id, easting_val, northing_val in points_list:
                 poly_coords.append((easting_val, northing_val))
                 
             poly = Polygon(poly_coords)
@@ -96,7 +95,7 @@ if st.button("🚀 Process and Generate KMZ"):
                 
                 # 4. Generate Machine-Readable JSON Summary (F9)
                 summary_data = {
-                    "extracted_grid_points": [{"point": p, "northing_yd": n, "easting_yd": e} for p, n, e in points_list],
+                    "extracted_grid_points": [{"point": p, "easting_yd": e, "northing_yd": n} for p, e, n in points_list],
                     "transformed_wgs84_points": [{"point": p, "latitude": lat, "longitude": lon} for p, lon, lat in transformed],
                     "computed_area_acres": round(area_acres, 4),
                     "computed_area_hectares": round(area_hectares, 4),
