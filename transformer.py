@@ -2,12 +2,12 @@ from pyproj import Transformer
 
 def transform_coordinates(points_list):
     """
-    Transforms coordinates from Indian Everest 1830 (Indian yards)
-    to WGS 84 (Latitude, Longitude).
+    Transforms coordinates from Pakistan Sindh Grid / Everest 1830 (Indian yards)
+    to WGS 84 (Latitude, Longitude) for accurate mapping in Pakistan.
     Input points_list: List of tuples (point_id, easting, northing)
     """
-    # Proj definition for Indian Everest 1830 grid in meters (scaled from yards)
-    src_crs = "+proj=tmerc +lat_0=24 +lon_0=80.15 +k=0.9999 +x_0=274318.59 +y_0=0 +ellps=evrst30 +units=m +no_defs"
+    # Corrected Proj definition centered on Sindh, Pakistan (Everest 1830 ellipsoid)
+    src_crs = "+proj=tmerc +lat_0=24.0 +lon_0=68.5 +k=0.9999 +x_0=2000000 +y_0=0 +ellps=evrst30 +units=m +no_defs"
     dst_crs = "EPSG:4326"
     
     transformer = Transformer.from_crs(src_crs, dst_crs, always_xy=True)
